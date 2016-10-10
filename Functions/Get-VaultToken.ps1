@@ -18,31 +18,41 @@ $authToken = Get-VaultToken
     Param()
 
     process {
-        write-debug "Get Policy Document"
-        $instancePkcs7Document = $null
-        $i = 0
-        while ( ($instancePkcs7Document -eq $null) -and ($i -lt 3) ) {            
-            $i++
-            try{
-                $instancePkcs7Document = (Invoke-WebRequest -Uri 'http://169.254.169.254/latest/dynamic/instance-identity/pkcs7').Content                
+        if ($env:Vault_AuthMethod -eq 'EC2'){
+            write-debug "Get Policy Document"
+            $instancePkcs7Document = $null
+            $i = 0
+            while ( ($instancePkcs7Document -eq $null) -and ($i -lt 3) ) {            
+                $i++
+                try{
+                    $instancePkcs7Document = (Invoke-WebRequest -Uri 'http://169.254.169.254/latest/dynamic/instance-identity/pkcs7').Content                
+                }
+                catch{
+                    sleep 2                
+                    write-warning "Could not get instance policy document"
+                }
             }
-            catch{
-                sleep 2                
-                write-warning "Could not get instance policy document"
+            if ($instancePkcs7Document -eq $null){
+                throw "Could not get instance policy document"
+            }        
+            
+            $body = @{
+                pkcs7 = "$instancePkcs7Document";
+                role = $env:Vault_Role;
+                nonce = $env:Vault_Nonce
             }
+            $vaultPath = 'v1/auth/aws-ec2/login'
         }
-        if ($instancePkcs7Document -eq $null){
-            throw "Could not get instance policy document"
-        }        
-        
-        $body = @{
-            pkcs7 = "$instancePkcs7Document";
-            role = $env:Vault_Role;
-            nonce = $env:Vault_Nonce
+        if ($env:Vault_AuthMethod -eq 'userpass'){
+            $vaultUsername = $env:Vault_Username
+            $vaultPath = "v1/auth/userpass/login/${vaultUsername}"
+            $body = @{
+                password = $env:Vault_Password;
+            }
         }
 
         $parameters = @{
-            VaultPath = 'v1/auth/aws-ec2/login';
+            VaultPath = $vaultPath;
             HttpMethod = 'Post';
             IgnoreSsl = $true;
             HttpBody = $body

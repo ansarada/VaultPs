@@ -30,6 +30,13 @@ Describe "Set-VaultDefaults" {
         [Environment]::GetEnvironmentVariable("Vault_Nonce","User").ToString() -match '[A-Za-z_0-9]' | Should Be $true
     }
     
+    It "It allows username and password authentication" {
+        Set-VaultDefaults -Servers 'vaulta.com', 'vaultb.com', 'vaultc.com' -Role 'testRole' -AuthMethod 'userpass' -Username 'user' -Password 'password123'
+        $env:Vault_AuthMethod | Should Be 'userpass'
+        $env:Vault_Username | Should Be 'user'
+        $env:Vault_Password | Should Be 'password123'
+    }
+    
     It "Does not overwrite a Nonce variable if already set and if AuthMethod is EC2" {
         $TempNonce = 'AbCDEFGHIJKLmNOPQRSTUVWXYZ123456'
         [Environment]::SetEnvironmentVariable("Vault_Nonce", $TempNonce, "User")
@@ -60,8 +67,16 @@ Describe "Set-VaultDefaults" {
         { Set-VaultDefaults -Role 'testRole' } | Should Throw
     }
     
-    It "Throws an error if no role is specified"{
-        { Set-VaultDefaults -Servers 'vaulta.com' } | Should Throw
+    It "Throws an error if no role is specified and auth method is ec2"{
+        { Set-VaultDefaults -Servers 'vaulta.com' -AuthMethod 'EC2' } | Should Throw
+    }
+    
+    It "Throws an error if no username is specified and auth method is userpass"{
+        { Set-VaultDefaults -Servers 'vaulta.com' -AuthMethod 'userpass' -Password '1234' } | Should Throw
+    }
+    
+    It "Throws an error if no password is specified and auth method is userpass"{
+        { Set-VaultDefaults -Servers 'vaulta.com' -AuthMethod 'userpass' -Username 'exampleUsername' } | Should Throw
     }
     
     It "Throws an error if an invalid Auth Method is specified"{
